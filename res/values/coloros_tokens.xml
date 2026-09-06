@@ -97,11 +97,13 @@
     <dimen name="coloros_workspace_folder_preview_top">7.667dp</dimen>
 
     <!-- All Apps surface tokens measured against the ColorOS reference launcher. -->
+    <!-- Oppo launcher_all_apps_container_background_color_without_blur — full-bleed tint. -->
+    <color name="coloros_all_apps_bg_layer">#1A000000</color>
     <color name="coloros_all_apps_scrim">#8A000000</color>
     <color name="coloros_all_apps_text">#FFFFFFFF</color>
     <color name="coloros_all_apps_text_secondary">#B8FFFFFF</color>
-    <!-- Search: frosted translucent so wallpaper reads through (Oppo). -->
-    <color name="coloros_all_apps_search_surface">#66999999</color>
+    <!-- Oppo drawer_search_default_bg_color — frost is fade+blur under the pill. -->
+    <color name="coloros_all_apps_search_surface">#33FFFFFF</color>
     <!-- Segment track + solid white selected pill (Oppo). -->
     <color name="coloros_all_apps_segment_track">#99404040</color>
     <color name="coloros_all_apps_segment_selected">#FFFFFFFF</color>
@@ -124,8 +126,31 @@
     <dimen name="coloros_all_apps_grid_horizontal_padding">12dp</dimen>
     <dimen name="coloros_all_apps_tab_gap_below_status">6dp</dimen>
     <dimen name="coloros_all_apps_list_bottom_gap">2dp</dimen>
-    <dimen name="coloros_all_apps_content_below_tabs">10dp</dimen>
-    <color name="coloros_category_card_surface">#665A5A5A</color>
+    <!-- Legacy gap token; list top inset is now layout margin (Oppo header_tab_height_aer). -->
+    <dimen name="coloros_all_apps_content_below_tabs">0dp</dimen>
+    <!-- Oppo all_apps_header_tab_height_aer — fallback content top inset. -->
+    <dimen name="coloros_all_apps_content_margin_top">72dp</dimen>
+    <!-- No extra list gap; Oppo nests under the segment then uses item padding. -->
+    <dimen name="coloros_all_apps_below_tab_gap">0dp</dimen>
+    <!-- Nest list (and top fade) under the segment — Oppo pager sits ~12dp into tab chrome. -->
+    <dimen name="coloros_all_apps_under_tab_overlap">12dp</dimen>
+    <!-- Oppo category_suggested_folder_padding_top. -->
+    <dimen name="coloros_category_recent_padding_top">12dp</dimen>
+    <!-- Oppo all_apps_custom_fade_layer_top_fading_height / bottom_fading_height. -->
+    <dimen name="coloros_all_apps_top_fade_height">32dp</dimen>
+    <!-- Oppo all_apps_custom_fade_layer_bottom_height_three_button. -->
+    <dimen name="coloros_all_apps_bottom_fade_height">128dp</dimen>
+    <!-- Oppo all_apps_custom_fade_layer_bottom_fading_height. -->
+    <dimen name="coloros_all_apps_bottom_fade_soft_height">38dp</dimen>
+    <color name="coloros_category_card_surface">#26FFFFFF</color>
+    <!-- Oppo suggestion uses the same category_bg_color as folder cards. -->
+    <color name="coloros_category_recent_surface">#26FFFFFF</color>
+    <!-- Oppo category_page_padding_start / category_folder_padding_start. -->
+    <dimen name="coloros_category_page_padding">16dp</dimen>
+    <dimen name="coloros_category_folder_padding">16dp</dimen>
+    <dimen name="coloros_category_card_radius">16dp</dimen>
+    <!-- Soft bottom dissolve for inset lists (not Oppo full-bleed 128dp solid). -->
+    <dimen name="coloros_all_apps_search_fade_band">40dp</dimen>
 
     <!-- Type scale used by launcher-owned content around native COUI components. -->
     <dimen name="coloros_text_size_caption">12sp</dimen>

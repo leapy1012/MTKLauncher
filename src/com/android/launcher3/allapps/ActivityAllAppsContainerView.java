@@ -695,40 +695,43 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     public void applyColorOsListPadding(int top, int bottom) {
         int hPad = getResources().getDimensionPixelSize(R.dimen.coloros_all_apps_grid_horizontal_padding);
         mAH.forEach(adapterHolder -> {
+            // Top inset is layout margin (Oppo); do not preserve stale large paddingTop.
             adapterHolder.mPadding.top = top;
             adapterHolder.mPadding.bottom = bottom;
             adapterHolder.mPadding.left = hPad;
-            // Equal trailing pad: A–Z overlays the edge (Oppo), keeping the grid centered.
             adapterHolder.mPadding.right = hPad;
             adapterHolder.applyPadding();
-            if (adapterHolder.mRecyclerView != null) {
-                adapterHolder.mRecyclerView.scrollToTop();
-            }
         });
     }
 
     /**
-     * Pin the apps / search RVs between the ColorOS tab header and the bottom search bar.
-     * Uses RelativeLayout.BELOW so the grid cannot draw under the tabs.
+     * Pin apps / search RVs with Oppo inset: nest slightly under the segment,
+     * bottom pinned above the search pill.
      */
     public void layoutColorOsAppsBelowTabs() {
         View tab = findViewById(R.id.coloros_category_tab_header);
         if (tab == null) {
             return;
         }
-        int contentGap = getResources().getDimensionPixelSize(
-                R.dimen.coloros_all_apps_content_below_tabs);
-        // Extra clearance so the first icon row is not clipped by the segment/menu.
-        int topGap = contentGap + Math.round(8 * getResources().getDisplayMetrics().density);
-        layoutColorOsContent(getAppsRecyclerViewContainer(), topGap);
-        layoutColorOsContent(getSearchRecyclerView(), topGap);
+        int overlap = getResources().getDimensionPixelSize(
+                R.dimen.coloros_all_apps_under_tab_overlap);
+        int belowGap = getResources().getDimensionPixelSize(
+                R.dimen.coloros_all_apps_below_tab_gap);
+        int topMargin = getResources().getDimensionPixelSize(
+                R.dimen.coloros_all_apps_content_margin_top);
+        int tabBottom = tab.getBottom() > 0 ? tab.getBottom()
+                : tab.getTop() + tab.getMeasuredHeight();
+        if (tabBottom > overlap) {
+            topMargin = tabBottom - overlap + belowGap;
+        }
+        layoutColorOsContent(getAppsRecyclerViewContainer(), topMargin);
+        layoutColorOsContent(getSearchRecyclerView(), topMargin);
         View appsList = findViewById(R.id.apps_list_view);
         if (appsList != null && appsList != getAppsRecyclerViewContainer()) {
-            layoutColorOsContent(appsList, topGap);
+            layoutColorOsContent(appsList, topMargin);
         }
-        layoutColorOsLetterRail(topGap);
-        // After search/list measure, re-center the short A–Z band.
-        post(() -> layoutColorOsLetterRail(topGap));
+        layoutColorOsLetterRail(0);
+        post(() -> layoutColorOsLetterRail(0));
         if (tab.getTranslationY() != 0f) {
             tab.setTranslationY(0f);
         }
@@ -775,8 +778,6 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         lp.topMargin = topGap + inset;
         lp.bottomMargin = 0;
         letter.setLayoutParams(lp);
-        // Do not force VISIBLE — ColorOsDrawerChrome owns visibility (hidden when
-        // sort ≠ by name or on Categories).
         letter.setTranslationY(0f);
         if (letter.getVisibility() == VISIBLE) {
             letter.bringToFront();
@@ -800,17 +801,34 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             return;
         }
         RelativeLayout.LayoutParams lp = (LayoutParams) v.getLayoutParams();
-        lp.removeRule(RelativeLayout.ALIGN_PARENT_TOP);
+        lp.removeRule(RelativeLayout.BELOW);
         lp.removeRule(RelativeLayout.ALIGN_TOP);
-        lp.addRule(RelativeLayout.BELOW, R.id.coloros_category_tab_header);
+        lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
         lp.addRule(RelativeLayout.ABOVE, R.id.search_container_all_apps);
-        lp.topMargin = topMarginPx;
+        lp.topMargin = Math.max(0, topMarginPx);
+        lp.bottomMargin = 0;
         v.setLayoutParams(lp);
         if (v instanceof AllAppsRecyclerView) {
-            ((AllAppsRecyclerView) v).setClipToPadding(true);
-            // Do not scrollToTop here. This runs on every ColorOS chrome re-layout
-            // (cluster dismiss, insets, header ready) and was wiping letter-index jumps,
-            // always forcing the rail follow highlight back to the first section (B).
+            AllAppsRecyclerView rv = (AllAppsRecyclerView) v;
+            rv.setClipToPadding(true);
+            rv.setClipChildren(true);
+            rv.setBackground(null);
+            int left = rv.getPaddingLeft();
+            int right = rv.getPaddingRight();
+            if (rv.getPaddingTop() != 0 || rv.getPaddingBottom() != 0) {
+                rv.setPadding(left, 0, right, 0);
+            }
+            com.android.launcher3.allapps.coloros.ColorOsEdgeFadeHelper fade =
+                    rv.getColorOsEdgeFade();
+            if (fade != null) {
+                fade.configureFromResources(getResources());
+                fade.setEnabled(true);
+                fade.ensureHostLayer(rv);
+                fade.applyToHost(rv);
+                fade.applyEdgeAlphas(rv);
+                rv.invalidate();
+            }
         }
     }
 

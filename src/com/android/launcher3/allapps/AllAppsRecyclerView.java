@@ -33,6 +33,7 @@ import android.graphics.Canvas;
 import android.util.AttributeSet;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.launcher3.DeviceProfile;
@@ -60,6 +61,10 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
 
     protected AlphabeticalAppsList<?> mApps;
 
+    /** ColorOS drawer only — Oppo edge fade (null when disabled). */
+    @Nullable
+    private final com.android.launcher3.allapps.coloros.ColorOsEdgeFadeHelper mColorOsFade;
+
     public AllAppsRecyclerView(Context context) {
         this(context, null);
     }
@@ -77,6 +82,52 @@ public class AllAppsRecyclerView extends FastScrollRecyclerView {
         super(context, attrs, defStyleAttr);
         mNumAppsPerRow = LauncherAppState.getIDP(context).numColumns;
         mFastScrollHelper = new AllAppsFastScrollHelper(this);
+        if (com.android.launcher3.allapps.coloros.ColorOsEdgeFadeHelper.shouldUse(context)) {
+            mColorOsFade = new com.android.launcher3.allapps.coloros.ColorOsEdgeFadeHelper();
+            mColorOsFade.setEnabled(true);
+            mColorOsFade.configureFromResources(context.getResources());
+            mColorOsFade.ensureHostLayer(this);
+            setClipToPadding(true);
+            addOnScrollListener(new OnScrollListener() {
+                @Override
+                public void onScrolled(RecyclerView rv, int dx, int dy) {
+                    if (mColorOsFade != null) {
+                        mColorOsFade.applyEdgeAlphas(AllAppsRecyclerView.this);
+                    }
+                }
+            });
+        } else {
+            mColorOsFade = null;
+        }
+    }
+
+    @Nullable
+    public com.android.launcher3.allapps.coloros.ColorOsEdgeFadeHelper getColorOsEdgeFade() {
+        return mColorOsFade;
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        if (mColorOsFade != null && mColorOsFade.isEnabled()) {
+            mColorOsFade.applyEdgeAlphas(this);
+        }
+    }
+
+    @Override
+    public void dispatchDraw(Canvas canvas) {
+        super.dispatchDraw(canvas);
+        if (mColorOsFade != null && mColorOsFade.isEnabled()) {
+            mColorOsFade.drawSoftScrims(this, canvas);
+        }
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        if (mColorOsFade != null && mColorOsFade.isEnabled()) {
+            mColorOsFade.ensureHostLayer(this);
+        }
+        super.draw(canvas);
     }
 
     /**

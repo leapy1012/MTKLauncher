@@ -19,6 +19,7 @@ import android.content.Context;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.WindowInsets;
 
 import com.android.launcher3.Launcher;
@@ -54,8 +55,16 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
                 public void onStateTransitionComplete(LauncherState finalState) {
                     if (finalState == LauncherState.ALL_APPS) {
                         ensureColorOsChromeAttached();
+                        if (mColorOsChrome != null) {
+                            mColorOsChrome.syncPageVisibility();
+                        }
                     } else {
                         dismissColorOsPopup();
+                        if (mColorOsChrome != null) {
+                            // Finish any in-flight All↔Categories crossfade so reopen
+                            // does not start with both pages half-visible.
+                            mColorOsChrome.syncPageVisibility();
+                        }
                     }
                 }
             };
@@ -122,6 +131,22 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
     public void reset(boolean animate, boolean exitSearch) {
         dismissColorOsPopup();
         super.reset(animate, exitSearch);
+        // reset() → animateToSearchState(false) forces the apps RV visible; if the
+        // user left the drawer on Categories, reassert exclusivity after that.
+        if (mColorOsChrome != null) {
+            mColorOsChrome.syncPageVisibility();
+        }
+    }
+
+    @Override
+    protected void updateSearchResultsVisibility() {
+        super.updateSearchResultsVisibility();
+        if (mColorOsChrome != null) {
+            mColorOsChrome.syncPageVisibility();
+        } else if (getResources().getBoolean(R.bool.config_coloros_drawer)
+                && mHeader != null) {
+            mHeader.setVisibility(GONE);
+        }
     }
 
     @Override
@@ -151,6 +176,35 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
         } else {
             return insets.getStableInsetBottom();
         }
+    }
+
+    @Override
+    public boolean shouldContainerScroll(MotionEvent ev) {
+        // Categories owns its own RecyclerView; AOSP only consults the All apps RV,
+        // which stays at offset 0 while Categories scrolls — that made swipe-down
+        // dismiss the drawer (unlike Oppo).
+        if (mColorOsChrome != null && mColorOsChrome.isShowingCategories()) {
+            return mColorOsChrome.shouldContainerScroll(ev);
+        }
+        return super.shouldContainerScroll(ev);
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (mColorOsChrome != null && isInAllApps()
+                && mColorOsChrome.onInterceptPageSwipe(ev)) {
+            return true;
+        }
+        return super.onInterceptTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        if (mColorOsChrome != null && isInAllApps()
+                && mColorOsChrome.onPageSwipeTouch(ev)) {
+            return true;
+        }
+        return super.onTouchEvent(ev);
     }
 
     @Override
