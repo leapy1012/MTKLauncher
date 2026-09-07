@@ -780,6 +780,10 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     }
 
     protected void drawEditSelectionCheckIfNecessary(Canvas canvas) {
+        if (com.android.launcher3.allapps.coloros.ColorOsDrawerSelectController
+                .drawCheckIfNeeded(this, canvas)) {
+            return;
+        }
         if (!(mActivity instanceof Launcher launcher)) {
             return;
         }

@@ -22,11 +22,14 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.WindowInsets;
 
+import androidx.annotation.Nullable;
+
 import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherState;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.coloros.ColorOsDrawerChrome;
+import com.android.launcher3.allapps.coloros.ColorOsDrawerSelectController;
 import com.android.launcher3.statemanager.StateManager.StateListener;
 
 /**
@@ -48,6 +51,7 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
                         // Oppo dismisses COUIPopupListWindow when leaving All Apps
                         // (Home / Overview); otherwise the popup window stays floating.
                         dismissColorOsPopup();
+                        exitDrawerSelectIfActive();
                     }
                 }
 
@@ -60,6 +64,7 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
                         }
                     } else {
                         dismissColorOsPopup();
+                        exitDrawerSelectIfActive();
                         if (mColorOsChrome != null) {
                             // Finish any in-flight All↔Categories crossfade so reopen
                             // does not start with both pages half-visible.
@@ -122,6 +127,21 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
         }
     }
 
+    private void exitDrawerSelectIfActive() {
+        if (mColorOsChrome != null && mColorOsChrome.isDrawerSelectActive()) {
+            mColorOsChrome.getSelectController().exit();
+        }
+    }
+
+    /** Oppo: Back exits Select before leaving the drawer. */
+    public boolean consumeDrawerSelectBack() {
+        if (isDrawerSelectActive()) {
+            getDrawerSelectController().exit();
+            return true;
+        }
+        return false;
+    }
+
     /** Called from {@link Launcher#onPause} — screen off / leave task. */
     public void onLauncherPaused() {
         dismissColorOsPopup();
@@ -138,6 +158,15 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
         return mColorOsChrome != null && mColorOsChrome.isSearchUiActive();
     }
 
+    @Nullable
+    public ColorOsDrawerSelectController getDrawerSelectController() {
+        return mColorOsChrome != null ? mColorOsChrome.getSelectController() : null;
+    }
+
+    public boolean isDrawerSelectActive() {
+        return mColorOsChrome != null && mColorOsChrome.isDrawerSelectActive();
+    }
+
     @Override
     protected boolean isColorOsSearchSessionActive() {
         return isColorOsSearchUiActive();
@@ -151,6 +180,7 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
     @Override
     public void reset(boolean animate, boolean exitSearch) {
         dismissColorOsPopup();
+        exitDrawerSelectIfActive();
         if (mColorOsChrome != null) {
             mColorOsChrome.setSearchUiActive(false);
         }

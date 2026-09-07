@@ -696,6 +696,12 @@ public class Launcher extends StatefulActivity<LauncherState>
         return new OnBackAnimationCallback() {
             @Override
             public void onBackInvoked() {
+                if (isInState(ALL_APPS)
+                        && getAppsView() instanceof
+                        com.android.launcher3.allapps.LauncherAllAppsContainerView appsView
+                        && appsView.consumeDrawerSelectBack()) {
+                    return;
+                }
                 onStateBack();
             }
 

@@ -178,10 +178,23 @@ public class LauncherModel extends LauncherApps.Callback implements InstallSessi
      */
     public void addAndBindAddedWorkspaceItems(
             @NonNull final List<Pair<ItemInfo, Object>> itemList) {
+        addAndBindAddedWorkspaceItems(itemList, false /* allowSystemApps */);
+    }
+
+    /**
+     * Adds the provided items to the workspace.
+     *
+     * @param allowSystemApps when true, place system apps too (user-requested add from
+     *                        the ColorOS drawer Select flow). Auto-install paths leave
+     *                        this false so drawer-mode still skips quiet system icons.
+     */
+    public void addAndBindAddedWorkspaceItems(
+            @NonNull final List<Pair<ItemInfo, Object>> itemList,
+            boolean allowSystemApps) {
         for (Callbacks cb : getCallbacks()) {
             cb.preAddApps();
         }
-        enqueueModelUpdateTask(new AddWorkspaceItemsTask(itemList));
+        enqueueModelUpdateTask(new AddWorkspaceItemsTask(itemList, allowSystemApps));
     }
 
     @NonNull

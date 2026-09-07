@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -81,6 +82,7 @@ public final class ColorOsDrawerChrome {
 
     private COUIPopupListWindow mPopupWindow;
     private final ArrayList<PopupListItem> mPopupItems = new ArrayList<>();
+    @Nullable private ColorOsDrawerSelectController mSelectController;
 
     // Oppo All↔Categories horizontal page swipe (OplusCategoryPagedView).
     private int mTouchSlop;
@@ -112,6 +114,46 @@ public final class ColorOsDrawerChrome {
         return mSearchUiActive;
     }
 
+    @NonNull
+    public ColorOsDrawerSelectController getSelectController() {
+        if (mSelectController == null) {
+            mSelectController = new ColorOsDrawerSelectController(mContainer, mLauncher, this);
+        }
+        return mSelectController;
+    }
+
+    public boolean isDrawerSelectActive() {
+        return mSelectController != null && mSelectController.isActive();
+    }
+
+    /**
+     * Oppo {@code changeTabViewStatus}: hide segment/menu while Select header shows.
+     */
+    void onDrawerSelectModeChanged(boolean selectActive) {
+        dismissPopupWindow();
+        dismissLetterCluster();
+        if (mTabHeader != null) {
+            mTabHeader.animate().cancel();
+            mTabHeader.setAlpha(selectActive ? 0f : 1f);
+            mTabHeader.setEnabled(!selectActive);
+            if (selectActive) {
+                mTabHeader.setVisibility(View.INVISIBLE);
+            } else {
+                mTabHeader.setVisibility(View.VISIBLE);
+            }
+        }
+        if (mLetterIndex != null) {
+            mLetterIndex.setVisibility(selectActive ? View.GONE
+                    : (mShowingCategories ? View.GONE : mLetterIndex.getVisibility()));
+            if (!selectActive) {
+                updateLetterRailVisibility();
+            }
+        }
+        if (selectActive && mSearchUiActive) {
+            setSearchUiActive(false);
+        }
+    }
+
     /**
      * Oppo {@code animateForSearch}: fade tabs, letter rail, category list, and apps
      * so wallpaper + scrim remain; search pill stays visible and raises with IME.
@@ -122,6 +164,10 @@ public final class ColorOsDrawerChrome {
                 applySearchUiVisibility();
             }
             return;
+        }
+        if (active && isDrawerSelectActive()) {
+            // Search and Select are mutually exclusive (Oppo).
+            mSelectController.exit();
         }
         mSearchUiActive = active;
         if (active) {
@@ -949,7 +995,7 @@ public final class ColorOsDrawerChrome {
         int itemId = mPopupItems.get(position).getId();
         if (itemId == MENU_ID_SELECT) {
             mPopupWindow.forceDismiss();
-            // Oppo enters multi-select edit; not ported yet — keep menu parity only.
+            getSelectController().enter();
             return;
         }
         if (itemId == MENU_ID_SETTINGS) {

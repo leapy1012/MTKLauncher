@@ -62,10 +62,25 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
     private final WorkspaceItemSpaceFinder mItemSpaceFinder;
 
     /**
+     * When true, skip the drawer-mode system-app filter so explicit user actions
+     * (e.g. ColorOS drawer Select → Add to Home) can place system apps.
+     */
+    private final boolean mAllowSystemApps;
+
+    /**
      * @param itemList items to add on the workspace
      */
     public AddWorkspaceItemsTask(@NonNull final List<Pair<ItemInfo, Object>> itemList) {
-        this(itemList, new WorkspaceItemSpaceFinder());
+        this(itemList, new WorkspaceItemSpaceFinder(), false /* allowSystemApps */);
+    }
+
+    /**
+     * @param itemList items to add on the workspace
+     * @param allowSystemApps if true, do not skip system apps (user-requested add)
+     */
+    public AddWorkspaceItemsTask(@NonNull final List<Pair<ItemInfo, Object>> itemList,
+            boolean allowSystemApps) {
+        this(itemList, new WorkspaceItemSpaceFinder(), allowSystemApps);
     }
 
     /**
@@ -74,8 +89,15 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
      */
     public AddWorkspaceItemsTask(@NonNull final List<Pair<ItemInfo, Object>> itemList,
             @NonNull final WorkspaceItemSpaceFinder itemSpaceFinder) {
+        this(itemList, itemSpaceFinder, false /* allowSystemApps */);
+    }
+
+    public AddWorkspaceItemsTask(@NonNull final List<Pair<ItemInfo, Object>> itemList,
+            @NonNull final WorkspaceItemSpaceFinder itemSpaceFinder,
+            boolean allowSystemApps) {
         mItemList = itemList;
         mItemSpaceFinder = itemSpaceFinder;
+        mAllowSystemApps = allowSystemApps;
     }
 
     @Override
@@ -105,7 +127,8 @@ public class AddWorkspaceItemsTask extends BaseModelUpdateTask {
                     }
                     // b/139663018 Short-circuit this logic if the icon is a system app
 					//hxy-feature: add launcher style function  202312
-                    if (PackageManagerHelper.isSystemApp(app.getContext(),
+                    // Explicit user adds (drawer Select → Add to Home) must allow system apps.
+                    if (!mAllowSystemApps && PackageManagerHelper.isSystemApp(app.getContext(),
                             Objects.requireNonNull(item.getIntent()))) {
                         ComponentName memory = new ComponentName(BuildConfig.APPLICATION_ID, "com.android.launcher3.big.memoryclean.MemoryCleanActivity");
                         ComponentName wallpaper = new ComponentName(BuildConfig.APPLICATION_ID, "com.android.launcher3.settings.WallpaperChangeActivity");

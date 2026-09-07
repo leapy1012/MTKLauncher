@@ -42,6 +42,7 @@ import com.android.launcher3.Launcher;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
+import com.android.launcher3.allapps.coloros.ColorOsDrawerSelectController;
 import com.android.launcher3.folder.Folder;
 import com.android.launcher3.folder.FolderIcon;
 import com.android.launcher3.logging.InstanceId;
@@ -103,6 +104,15 @@ public class ItemClickHandler {
                 return;
             }
             return;
+        }
+        // ColorOS drawer overflow → Select: toggle instead of launching.
+        if (launcher.getAppsView() instanceof
+                com.android.launcher3.allapps.LauncherAllAppsContainerView appsView
+                && appsView.isDrawerSelectActive()) {
+            ColorOsDrawerSelectController select = appsView.getDrawerSelectController();
+            if (select != null && select.onItemClick(v)) {
+                return;
+            }
         }
         if (v instanceof HxyAnimBubbleTextView) {
             HxyAnimBubbleTextView icon = (HxyAnimBubbleTextView) v;

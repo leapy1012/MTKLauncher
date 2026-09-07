@@ -125,6 +125,15 @@
     <string name="coloros_drawer_app_sort_select">Select</string>
     <string name="coloros_drawer_app_sort_sort">Sort</string>
     <string name="coloros_drawer_category_settings">Settings</string>
+    <string name="coloros_drawer_select_cancel">Cancel</string>
+    <string name="coloros_drawer_add_app_to_launcher">Add to Home screen</string>
+    <string name="coloros_drawer_select_uninstall">Uninstall</string>
+    <string name="coloros_drawer_select_max">A maximum of %1$d icons can be selected</string>
+    <string name="coloros_drawer_select_none_uninstallable">Selected apps cannot be uninstalled</string>
+    <plurals name="coloros_drawer_select_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
     <string name="coloros_category_recently_installed">Recently installed</string>
     <string name="coloros_alphabet_sort">By name</string>
     <string name="coloros_frequence_sort">By usage</string>

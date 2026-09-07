@@ -6,4 +6,5 @@
     <item name="coloros_all_apps_bg_layer" type="id" />
     <item name="coloros_all_apps_tab_fade" type="id" />
     <item name="coloros_all_apps_search_fade" type="id" />
+    <item name="coloros_drawer_select_bottom_bar_root" type="id" />
 </resources>

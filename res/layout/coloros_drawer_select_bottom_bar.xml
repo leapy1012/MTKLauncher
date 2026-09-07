@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Oppo page_drawer_button — Add to Home / Uninstall pills. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/coloros_drawer_select_bottom_bar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:visibility="gone"
+    android:forceDarkAllowed="false"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/coloros_drawer_select_add_home"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:layout_marginEnd="4dp"
+        android:background="@drawable/coloros_drawer_select_pill"
+        android:gravity="center"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="@string/coloros_drawer_add_app_to_launcher"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:forceDarkAllowed="false" />
+
+    <TextView
+        android:id="@+id/coloros_drawer_select_uninstall"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:background="@drawable/coloros_drawer_select_pill"
+        android:gravity="center"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:text="@string/coloros_drawer_select_uninstall"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:forceDarkAllowed="false" />
+</LinearLayout>

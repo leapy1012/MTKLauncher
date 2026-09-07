@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Oppo all_apps_select_container — cancel X + "N selected". -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/coloros_drawer_select_header"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:visibility="gone"
+    android:forceDarkAllowed="false"
+    android:clickable="true"
+    android:focusable="true">
+
+    <ImageView
+        android:id="@+id/coloros_drawer_select_cancel"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:padding="4dp"
+        android:src="@drawable/coloros_drawer_select_cancel"
+        android:contentDescription="@string/coloros_drawer_select_cancel"
+        android:forceDarkAllowed="false" />
+
+    <TextView
+        android:id="@+id/coloros_drawer_select_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:forceDarkAllowed="false" />
+</LinearLayout>
