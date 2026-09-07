@@ -104,6 +104,8 @@
     <color name="coloros_all_apps_text_secondary">#B8FFFFFF</color>
     <!-- Oppo drawer_search_default_bg_color — frost is fade+blur under the pill. -->
     <color name="coloros_all_apps_search_surface">#33FFFFFF</color>
+    <!-- Oppo drawer_search_default_bg_color — keyword frost behind match in labels. -->
+    <color name="coloros_drawer_search_highlight_bg">#33FFFFFF</color>
     <!-- Segment track + solid white selected pill (Oppo). -->
     <color name="coloros_all_apps_segment_track">#99404040</color>
     <color name="coloros_all_apps_segment_selected">#FFFFFFFF</color>
@@ -117,6 +119,15 @@
     <integer name="coloros_all_apps_index_height_percent">62</integer>
     <!-- Gap between search pill bottom and nav-bar top (nav inset added in code). -->
     <dimen name="coloros_all_apps_search_margin_bottom">5dp</dimen>
+    <!-- Oppo all_apps_category_search_container_margin_bottom_search — gap above IME. -->
+    <dimen name="coloros_all_apps_search_ime_gap">18dp</dimen>
+    <!-- Compact search-grid row height (Oppo all-apps search cell); used when RV children are not laid out yet. -->
+    <dimen name="coloros_all_apps_search_cell_height">104dp</dimen>
+    <dimen name="coloros_all_apps_search_clear_size">28dp</dimen>
+    <!-- Oppo drawer_search_empty_img_* + caption block for settle math. -->
+    <dimen name="coloros_all_apps_search_empty_img_width">280dp</dimen>
+    <dimen name="coloros_all_apps_search_empty_img_height">200dp</dimen>
+    <dimen name="coloros_all_apps_search_empty_block_height">240dp</dimen>
     <!-- Match grid side inset so search width lines up with icon columns. -->
     <dimen name="coloros_all_apps_search_margin_horizontal">12dp</dimen>
     <dimen name="coloros_all_apps_search_icon_size">18dp</dimen>
@@ -149,6 +160,17 @@
     <dimen name="coloros_category_page_padding">16dp</dimen>
     <dimen name="coloros_category_folder_padding">16dp</dimen>
     <dimen name="coloros_category_card_radius">16dp</dimen>
+    <!-- Oppo category_space_height / category_name_* for open category folder. -->
+    <dimen name="coloros_category_folder_space_top">100dp</dimen>
+    <dimen name="coloros_category_folder_title_height">40dp</dimen>
+    <dimen name="coloros_category_folder_title_size">28sp</dimen>
+    <!-- Oppo category_cell_height / category_cell_width_padding / content_wrapper_margin_top. -->
+    <dimen name="coloros_category_folder_cell_height">100dp</dimen>
+    <dimen name="coloros_category_folder_side_padding">13dp</dimen>
+    <dimen name="coloros_category_folder_content_margin_top">16dp</dimen>
+    <dimen name="coloros_category_folder_name_padding">3dp</dimen>
+    <!-- Rows below this are vertically centered (Oppo categoryCenterRow = 5). -->
+    <integer name="coloros_category_folder_center_row">5</integer>
     <!-- Soft bottom dissolve for inset lists (not Oppo full-bleed 128dp solid). -->
     <dimen name="coloros_all_apps_search_fade_band">40dp</dimen>
 

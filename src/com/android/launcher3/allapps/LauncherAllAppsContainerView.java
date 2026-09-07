@@ -127,9 +127,33 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
         dismissColorOsPopup();
     }
 
+    /** Called from the ColorOS search field when focus enters/leaves search. */
+    public void setColorOsSearchUiActive(boolean active) {
+        if (mColorOsChrome != null) {
+            mColorOsChrome.setSearchUiActive(active);
+        }
+    }
+
+    public boolean isColorOsSearchUiActive() {
+        return mColorOsChrome != null && mColorOsChrome.isSearchUiActive();
+    }
+
+    @Override
+    protected boolean isColorOsSearchSessionActive() {
+        return isColorOsSearchUiActive();
+    }
+
+    @Override
+    protected boolean suppressSearchTransitionChrome() {
+        return isColorOsSearchUiActive();
+    }
+
     @Override
     public void reset(boolean animate, boolean exitSearch) {
         dismissColorOsPopup();
+        if (mColorOsChrome != null) {
+            mColorOsChrome.setSearchUiActive(false);
+        }
         super.reset(animate, exitSearch);
         // reset() → animateToSearchState(false) forces the apps RV visible; if the
         // user left the drawer on Categories, reassert exclusivity after that.
@@ -140,6 +164,18 @@ public class LauncherAllAppsContainerView extends ActivityAllAppsContainerView<L
 
     @Override
     protected void updateSearchResultsVisibility() {
+        if (mColorOsChrome != null
+                && (mColorOsChrome.isSearchUiActive() || isSearching())) {
+            // Whole ColorOS search session: keep search RV visible (frequent / results /
+            // empty). Never flash All or Categories underneath.
+            getSearchRecyclerView().setVisibility(VISIBLE);
+            getAppsRecyclerViewContainer().setVisibility(GONE);
+            if (mHeader != null) {
+                mHeader.setVisibility(GONE);
+            }
+            mColorOsChrome.syncPageVisibility();
+            return;
+        }
         super.updateSearchResultsVisibility();
         if (mColorOsChrome != null) {
             mColorOsChrome.syncPageVisibility();

@@ -42,9 +42,12 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.icu.text.MessageFormat;
+import android.text.SpannableString;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.TextUtils.TruncateAt;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.AttributeSet;
 import android.util.Property;
 import android.util.TypedValue;
@@ -98,6 +101,7 @@ import com.android.launcher3.views.IconLabelDotView;
 
 import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 
 import com.android.launcher3.dot.NumberDotRenderer;
@@ -141,6 +145,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     private IntArray mBreakPointsIntArray;
     private CharSequence mLastOriginalText;
     private CharSequence mLastModifiedText;
+    /** Oppo searchHighlightContent — query substrings to bold in search result labels. */
+    @Nullable private List<String> mSearchHighlightContent;
 
     //hxy_leifengqi update to Dynamic clock 20230302 start
     private DynamicClockIcon dynamicClockIcon = null;
@@ -334,10 +340,19 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         }
 
         setTag(null);
+        mSearchHighlightContent = null;
         if (mIconLoadRequest != null) {
             mIconLoadRequest.cancel();
             mIconLoadRequest = null;
         }
+    }
+
+    /**
+     * Oppo {@code setSearchHighlightContent}: bold matching query pieces in
+     * {@link #applyLabel} for All Apps search results.
+     */
+    public void setSearchHighlightContent(@Nullable List<String> highlights) {
+        mSearchHighlightContent = highlights;
     }
 
     public void setIsNeedIconChangeAnim(boolean need) {
@@ -536,10 +551,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
             mBreakPointsIntArray = StringMatcherUtility.getListOfBreakpoints(label, MATCHER);
+            CharSequence display = applySearchHighlight(label);
             if (mIsNeedTextChangeAnim && !TextUtils.isEmpty(getText())) {
-                getIconChangeAnimManager().changeTextWithFade(label);
+                getIconChangeAnimManager().changeTextWithFade(display);
             } else {
-                setText(label);
+                setText(display);
             }
         }
         if (info.contentDescription != null) {
@@ -547,6 +563,37 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                     ? getContext().getString(R.string.disabled_app_label, info.contentDescription)
                     : info.contentDescription);
         }
+    }
+
+    /**
+     * Oppo {@code changeTextHighlightContent}: bold + frost background on the first
+     * case-insensitive occurrence of each highlight token.
+     */
+    private CharSequence applySearchHighlight(CharSequence label) {
+        if (mSearchHighlightContent == null || mSearchHighlightContent.isEmpty()
+                || TextUtils.isEmpty(label)) {
+            return label;
+        }
+        String text = label.toString();
+        String lower = text.toLowerCase(Locale.getDefault());
+        SpannableString spannable = new SpannableString(text);
+        boolean any = false;
+        int bg = getResources().getColor(R.color.coloros_drawer_search_highlight_bg, null);
+        for (String token : mSearchHighlightContent) {
+            if (TextUtils.isEmpty(token)) {
+                continue;
+            }
+            int start = lower.indexOf(token.toLowerCase(Locale.getDefault()));
+            if (start >= 0) {
+                int end = start + token.length();
+                spannable.setSpan(new BackgroundColorSpan(bg), start, end,
+                        SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+                spannable.setSpan(new StyleSpan(Typeface.BOLD), start, end,
+                        SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+                any = true;
+            }
+        }
+        return any ? spannable : label;
     }
 
     /** This is used for testing to forcefully set the display to ALL_APPS */

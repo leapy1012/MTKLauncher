@@ -130,6 +130,20 @@ public class SearchTransitionController {
         }
         mSearchToAzAnimator.addListener(forSuccessCallback(onEndRunnable));
 
+        // ColorOS search session already hid All/Categories chrome; do not flash them
+        // back during the AOSP search↔A-Z transition.
+        if (mAllAppsContainerView.suppressSearchTransitionChrome()) {
+            mAllAppsContainerView.getFloatingHeaderView().setVisibility(View.GONE);
+            mAllAppsContainerView.getAppsRecyclerViewContainer().setVisibility(View.GONE);
+            getSearchRecyclerView().setVisibility(VISIBLE);
+            getSearchRecyclerView().setChildAttachedConsumer(this::onSearchChildAttached);
+            // Jump to end state — no crossfade of drawer icons under the IME.
+            setSearchToAzProgress(targetProgress);
+            mSearchToAzAnimator.setDuration(0);
+            mSearchToAzAnimator.start();
+            return;
+        }
+
         mAllAppsContainerView.getFloatingHeaderView().setFloatingRowsCollapsed(true);
         mAllAppsContainerView.getFloatingHeaderView().setVisibility(VISIBLE);
         mAllAppsContainerView.getFloatingHeaderView().maybeSetTabVisibility(VISIBLE);

@@ -4,4 +4,5 @@
     <string name="search_error_empty">No relevavant applications were found</string>
 
     <string name="usagestats_section_name">Commonly used application</string>
+    <string name="coloros_all_apps_no_search_results">No results</string>
 </resources>

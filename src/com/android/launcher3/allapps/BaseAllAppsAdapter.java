@@ -97,6 +97,11 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
         public int rowAppIndex;
         // The associated ItemInfoWithIcon for the item
         public AppInfo itemInfo = null;
+        /**
+         * Oppo {@code searchHighlightContent}: query substrings to bold in the
+         * icon label while showing search results. Null outside search.
+         */
+        @Nullable public List<String> searchHighlightContent = null;
 
         public AdapterItem(int viewType) {
             this.viewType = viewType;
@@ -140,7 +145,9 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
         public boolean isContentSame(AdapterItem other) {
             if (viewType == VIEW_TYPE_ICON) {
                 // Same AppInfo instance after reorder → animate move only, no rebind.
-                return itemInfo == other.itemInfo;
+                // Highlight query must also match or DiffUtil would skip a needed rebind.
+                return itemInfo == other.itemInfo
+                        && Objects.equals(searchHighlightContent, other.searchHighlightContent);
             }
             return itemInfo == null && other.itemInfo == null;
         }
@@ -227,8 +234,11 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                 }
                 return new ViewHolder(icon);
             case VIEW_TYPE_EMPTY_SEARCH:
-                return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_empty_search,
-                        parent, false));
+                int emptyLayout = mActivityContext.getResources().getBoolean(
+                        R.bool.config_coloros_drawer)
+                        ? R.layout.coloros_all_apps_empty_search
+                        : R.layout.all_apps_empty_search;
+                return new ViewHolder(mLayoutInflater.inflate(emptyLayout, parent, false));
             case VIEW_TYPE_ALL_APPS_DIVIDER:
                 return new ViewHolder(mLayoutInflater.inflate(
                         R.layout.all_apps_divider, parent, false));
@@ -257,14 +267,33 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                 if (!icon.getIsNeedIconChangeAnim()) {
                     icon.reset();
                 }
+                // Oppo BaseAllAppsAdapter: bold matching query substrings in search results.
+                icon.setSearchHighlightContent(adapterItem.searchHighlightContent);
                 icon.applyFromApplicationInfo(adapterItem.itemInfo);
                 break;
             }
             case VIEW_TYPE_EMPTY_SEARCH: {
                 AppInfo info = mApps.getAdapterItems().get(position).itemInfo;
-                if (info != null) {
-                    ((TextView) holder.itemView).setText(mActivityContext.getString(
-                            R.string.all_apps_no_search_results, info.title));
+                TextView empty = holder.itemView.findViewById(R.id.empty_text);
+                if (empty == null && holder.itemView instanceof TextView) {
+                    empty = (TextView) holder.itemView;
+                }
+                if (empty != null) {
+                    if (mActivityContext.getResources().getBoolean(R.bool.config_coloros_drawer)) {
+                        // Oppo: short "No results" (no query echo).
+                        empty.setText(R.string.coloros_all_apps_no_search_results);
+                    } else if (info != null) {
+                        empty.setText(mActivityContext.getString(
+                                R.string.all_apps_no_search_results, info.title));
+                    }
+                }
+                View lottie = holder.itemView.findViewById(R.id.coloros_search_empty_lottie);
+                if (lottie instanceof com.airbnb.lottie.LottieAnimationView) {
+                    com.airbnb.lottie.LottieAnimationView lav =
+                            (com.airbnb.lottie.LottieAnimationView) lottie;
+                    if (!lav.isAnimating()) {
+                        lav.playAnimation();
+                    }
                 }
                 break;
             }

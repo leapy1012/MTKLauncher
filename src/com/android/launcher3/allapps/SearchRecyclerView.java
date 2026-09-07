@@ -17,17 +17,29 @@ package com.android.launcher3.allapps;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 import androidx.annotation.NonNull;
 import androidx.core.util.Consumer;
 
+import com.android.launcher3.BubbleTextView;
+import com.android.launcher3.R;
+import com.android.launcher3.views.ActivityContext;
 import com.android.launcher3.views.RecyclerViewFastScroller;
 
 /** A RecyclerView for AllApps Search results. */
 public class SearchRecyclerView extends AllAppsRecyclerView {
 
     private Consumer<View> mChildAttachedConsumer;
+
+    /** ColorOS empty-space tap tracking (Oppo OplusAllAppsRecyclerView). */
+    private final boolean mColorOsDrawer;
+    private final int mTouchSlop;
+    private boolean mColorOsTrackingClick;
+    private float mDownX;
+    private float mDownY;
 
     public SearchRecyclerView(Context context) {
         this(context, null);
@@ -44,6 +56,8 @@ public class SearchRecyclerView extends AllAppsRecyclerView {
     public SearchRecyclerView(Context context, AttributeSet attrs, int defStyleAttr,
             int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        mColorOsDrawer = context.getResources().getBoolean(R.bool.config_coloros_drawer);
+        mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
     /** This will be called just before a new child is attached to the window. */
@@ -74,5 +88,59 @@ public class SearchRecyclerView extends AllAppsRecyclerView {
             mChildAttachedConsumer.accept(child);
         }
         super.onChildAttachedToWindow(child);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent e) {
+        boolean handled = super.onTouchEvent(e);
+        if (mColorOsDrawer) {
+            tryHandleColorOsEmptySpaceGesture(e);
+        }
+        return handled;
+    }
+
+    /**
+     * Oppo: empty-space tap on search RV — hide IME first, then exit search.
+     * Icon taps are ignored here so launch still works normally.
+     */
+    private void tryHandleColorOsEmptySpaceGesture(MotionEvent e) {
+        final int action = e.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mColorOsTrackingClick = true;
+            mDownX = e.getX();
+            mDownY = e.getY();
+            return;
+        }
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (mColorOsTrackingClick
+                    && (Math.abs(e.getX() - mDownX) > mTouchSlop
+                    || Math.abs(e.getY() - mDownY) > mTouchSlop)) {
+                mColorOsTrackingClick = false;
+                ActivityContext ctx = ActivityContext.lookupContext(getContext());
+                if (ctx.getAppsView() != null) {
+                    ctx.getAppsView().getSearchUiManager().onSearchRecyclerViewScroll();
+                }
+            }
+            return;
+        }
+        if (action != MotionEvent.ACTION_UP) {
+            if (action == MotionEvent.ACTION_CANCEL) {
+                mColorOsTrackingClick = false;
+            }
+            return;
+        }
+        if (!mColorOsTrackingClick) {
+            return;
+        }
+        mColorOsTrackingClick = false;
+        View under = findChildViewUnder(e.getX(), e.getY());
+        if (under instanceof BubbleTextView) {
+            // Icon hit — launch path owns this touch.
+            return;
+        }
+        ActivityContext ctx = ActivityContext.lookupContext(getContext());
+        if (ctx.getAppsView() != null) {
+            ctx.getAppsView().getSearchUiManager().onSearchRecyclerViewClick();
+        }
     }
 }

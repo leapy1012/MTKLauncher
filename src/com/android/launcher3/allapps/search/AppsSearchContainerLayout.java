@@ -22,22 +22,32 @@ import static android.view.View.MeasureSpec.makeMeasureSpec;
 import static com.android.launcher3.Utilities.prefixTextWithIcon;
 import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTOR;
 
+import static com.android.launcher3.util.Executors.MAIN_EXECUTOR;
+import static com.android.launcher3.util.Executors.MODEL_EXECUTOR;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.text.Editable;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.text.method.TextKeyListener;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup.MarginLayoutParams;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.RelativeLayout;
+
+import androidx.annotation.Nullable;
 
 import com.android.launcher3.DeviceProfile;
 import com.android.launcher3.ExtendedEditText;
@@ -46,7 +56,10 @@ import com.android.launcher3.R;
 import com.android.launcher3.allapps.ActivityAllAppsContainerView;
 import com.android.launcher3.allapps.AllAppsStore;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
+import com.android.launcher3.allapps.LauncherAllAppsContainerView;
 import com.android.launcher3.allapps.SearchUiManager;
+import com.android.launcher3.allapps.coloros.ColorOsCommonlyUsedAppsProvider;
+import com.android.launcher3.allapps.coloros.ColorOsSearchImeHelper;
 import com.android.launcher3.search.SearchCallback;
 import com.android.launcher3.views.ActivityContext;
 
@@ -64,6 +77,13 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     private final SpannableStringBuilder mSearchQueryBuilder;
 
     private ActivityAllAppsContainerView<?> mAppsView;
+    private ColorOsSearchImeHelper mColorOsImeHelper;
+    @Nullable private Drawable mColorOsClearDrawable;
+    private boolean mColorOsClearVisible;
+    /** Generation to drop stale commonly-used loads after the user typed/left search. */
+    private int mCommonlyUsedLoadGen;
+    /** True while tearing down a ColorOS search session (ignore text-watcher side effects). */
+    private boolean mExitingColorOsSearch;
 
     // The amount of pixels to shift down and overlap with the rest of the content.
     private final int mContentOverlap;
@@ -89,6 +109,15 @@ public class AppsSearchContainerLayout extends ExtendedEditText
             // that ImageSpan + drawableStart stacked two icons and left a huge gap.
             setHint(getResources().getString(R.string.coloros_all_apps_search_hint));
             applyColorOsSearchIcon();
+            mColorOsClearDrawable = getResources().getDrawable(
+                    R.drawable.coloros_all_apps_search_clear, getContext().getTheme());
+            if (mColorOsClearDrawable != null) {
+                mColorOsClearDrawable = mColorOsClearDrawable.mutate();
+                int clearSize = getResources().getDimensionPixelSize(
+                        R.dimen.coloros_all_apps_search_clear_size);
+                mColorOsClearDrawable.setBounds(0, 0, clearSize, clearSize);
+            }
+            addTextChangedListener(mColorOsClearWatcher);
         } else {
             setHint(prefixTextWithIcon(getContext(), R.drawable.ic_allapps_search, getHint()));
         }
@@ -149,9 +178,67 @@ public class AppsSearchContainerLayout extends ExtendedEditText
             icon = new BitmapDrawable(getResources(), full);
         }
         icon.setTargetDensity(densityDpi);
-        setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, null, null);
+        setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null,
+                mColorOsClearVisible ? mColorOsClearDrawable : null, null);
         setCompoundDrawablePadding(getResources().getDimensionPixelSize(
                 R.dimen.coloros_all_apps_search_icon_text_gap));
+    }
+
+    private final TextWatcher mColorOsClearWatcher = new TextWatcher() {
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+        @Override
+        public void afterTextChanged(Editable s) {
+            updateColorOsClearVisibility();
+        }
+    };
+
+    private void updateColorOsClearVisibility() {
+        if (mColorOsClearDrawable == null) {
+            return;
+        }
+        boolean show = !TextUtils.isEmpty(getText());
+        if (show == mColorOsClearVisible) {
+            return;
+        }
+        mColorOsClearVisible = show;
+        Drawable[] rel = getCompoundDrawablesRelative();
+        setCompoundDrawablesRelativeWithIntrinsicBounds(
+                rel[0], null, show ? mColorOsClearDrawable : null, null);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (mColorOsClearVisible && mColorOsClearDrawable != null
+                && event.getAction() == MotionEvent.ACTION_UP
+                && isColorOsClearTouched(event.getX())) {
+            setText("");
+            return true;
+        }
+        return super.onTouchEvent(event);
+    }
+
+    /** Hit-test the end compound drawable (Oppo quick-delete). */
+    private boolean isColorOsClearTouched(float x) {
+        Drawable end = getCompoundDrawablesRelative()[2];
+        if (end == null) {
+            return false;
+        }
+        int clearW = end.getBounds().width();
+        if (clearW <= 0) {
+            clearW = mColorOsClearDrawable.getIntrinsicWidth();
+        }
+        // Expand touch target slightly past the glyph.
+        int slop = getResources().getDimensionPixelSize(
+                R.dimen.coloros_all_apps_search_padding_horizontal);
+        if (getLayoutDirection() == LAYOUT_DIRECTION_RTL) {
+            return x <= getPaddingStart() + clearW + slop;
+        }
+        return x >= getWidth() - getPaddingEnd() - clearW - slop;
     }
 
     @Override
@@ -216,17 +303,270 @@ public class AppsSearchContainerLayout extends ExtendedEditText
     public void initializeSearch(ActivityAllAppsContainerView<?> appsView) {
         mAppsView = appsView;
         mSearchBarController.initialize(
-                new DefaultAppSearchAlgorithm(getContext(), true),
+                getResources().getBoolean(R.bool.config_coloros_drawer)
+                        ? new com.android.launcher3.allapps.coloros.ColorOsDefaultAppSearchAlgorithm(
+                                getContext())
+                        : new DefaultAppSearchAlgorithm(getContext(), true),
                 this, mLauncher, this);
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)) {
+            mColorOsImeHelper = new ColorOsSearchImeHelper(this, appsView);
+            addOnFocusChangeListener(mColorOsFocusListener);
+            // Own back handling: first hides IME (resting search), second exits session.
+            setOnBackKeyListener(this::onColorOsBackKey);
+        }
+    }
+
+    private final OnFocusChangeListener mColorOsFocusListener = (v, hasFocus) -> {
+        if (!getResources().getBoolean(R.bool.config_coloros_drawer)) {
+            return;
+        }
+        if (hasFocus) {
+            enterColorOsSearchSession(/* showIme= */ true);
+        } else if (isColorOsSearchSessionActive()) {
+            // Oppo: losing focus / IME dismiss does NOT exit search — settle to resting.
+            if (mColorOsImeHelper != null) {
+                mColorOsImeHelper.refreshFromRootInsets();
+            }
+        }
+    };
+
+    private boolean isColorOsSearchSessionActive() {
+        return mAppsView instanceof LauncherAllAppsContainerView
+                && ((LauncherAllAppsContainerView) mAppsView).isColorOsSearchUiActive();
+    }
+
+    private void setColorOsSearchUiActive(boolean active) {
+        if (mAppsView instanceof LauncherAllAppsContainerView) {
+            ((LauncherAllAppsContainerView) mAppsView).setColorOsSearchUiActive(active);
+        }
+    }
+
+    /** Enter Oppo-style search session (chrome hidden + frequent apps). */
+    private void enterColorOsSearchSession(boolean showIme) {
+        setColorOsSearchUiActive(true);
+        if (mColorOsImeHelper != null) {
+            mColorOsImeHelper.setEnabled(true);
+        }
+        if (TextUtils.isEmpty(getText())) {
+            showColorOsCommonlyUsedApps();
+        }
+        if (showIme && !isImeVisible()) {
+            showSoftInputOnly();
+        }
+    }
+
+    /** Full exit back to All/Categories (Oppo resetSearch / leave drawer). */
+    private void exitColorOsSearchSession() {
+        mExitingColorOsSearch = true;
+        mCommonlyUsedLoadGen++;
+        try {
+            hideSoftInputOnly();
+            if (mColorOsImeHelper != null) {
+                mColorOsImeHelper.setEnabled(false);
+                mColorOsImeHelper.resetTranslation();
+            }
+            if (isFocused()) {
+                clearFocus();
+            }
+            if (!TextUtils.isEmpty(getText())) {
+                setText("");
+            }
+            if (mAppsView != null) {
+                mAppsView.clearColorOsSearchSessionResults();
+            }
+            // Restore All or Categories after search RV is gone — no All flash.
+            setColorOsSearchUiActive(false);
+            mSearchBarController.reset();
+            setOnBackKeyListener(this::onColorOsBackKey);
+            updateColorOsClearVisibility();
+        } finally {
+            mExitingColorOsSearch = false;
+        }
+    }
+
+    private boolean onColorOsBackKey() {
+        if (!isColorOsSearchSessionActive()) {
+            return false;
+        }
+        if (isImeVisible()) {
+            // First back / IME dismiss chevron: resting search (oppo_search2).
+            hideSoftInputOnly();
+            if (mColorOsImeHelper != null) {
+                mColorOsImeHelper.refreshFromRootInsets();
+            }
+            return true;
+        }
+        exitColorOsSearchSession();
+        return true;
+    }
+
+    /**
+     * Oppo {@code onSearchRecyclerViewClick}: empty-space tap on results.
+     * IME visible → hide only; else → exit to All/Categories.
+     */
+    @Override
+    public void onSearchRecyclerViewClick() {
+        if (!getResources().getBoolean(R.bool.config_coloros_drawer)
+                || !isColorOsSearchSessionActive()) {
+            return;
+        }
+        if (isImeVisible()) {
+            hideSoftInputOnly();
+            if (mColorOsImeHelper != null) {
+                mColorOsImeHelper.refreshFromRootInsets();
+            }
+            return;
+        }
+        exitColorOsSearchSession();
+    }
+
+    @Override
+    public void onSearchRecyclerViewScroll() {
+        if (!getResources().getBoolean(R.bool.config_coloros_drawer)
+                || !isColorOsSearchSessionActive()) {
+            return;
+        }
+        if (isImeVisible()) {
+            hideSoftInputOnly();
+            if (mColorOsImeHelper != null) {
+                mColorOsImeHelper.refreshFromRootInsets();
+            }
+        }
+    }
+
+    /** Called after drawer content re-pin so frequent apps re-settle above the pill. */
+    public void onColorOsHostLayoutSettled() {
+        if (mColorOsImeHelper != null) {
+            mColorOsImeHelper.settleAfterHostLayout();
+        }
+    }
+
+    @Override
+    public void hideKeyboard() {
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)
+                && isColorOsSearchSessionActive()) {
+            // Oppo hideKeyboard: soft-input only — keep session + focus semantics.
+            hideSoftInputOnly();
+            if (mColorOsImeHelper != null) {
+                post(() -> {
+                    if (mColorOsImeHelper != null) {
+                        mColorOsImeHelper.refreshFromRootInsets();
+                    }
+                });
+            }
+            return;
+        }
+        super.hideKeyboard();
+    }
+
+    @Override
+    public boolean onKeyPreIme(int keyCode, KeyEvent event) {
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)
+                && keyCode == KeyEvent.KEYCODE_BACK
+                && event.getAction() == KeyEvent.ACTION_UP
+                && isColorOsSearchSessionActive()) {
+            return onColorOsBackKey();
+        }
+        return super.onKeyPreIme(keyCode, event);
+    }
+
+    private boolean isImeVisible() {
+        WindowInsets wi = getRootWindowInsets();
+        return wi != null && wi.isVisible(WindowInsets.Type.ime());
+    }
+
+    private void hideSoftInputOnly() {
+        InputMethodManager imm = getContext().getSystemService(InputMethodManager.class);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(getWindowToken(), 0);
+        }
+    }
+
+    private void showSoftInputOnly() {
+        requestFocus();
+        InputMethodManager imm = getContext().getSystemService(InputMethodManager.class);
+        if (imm != null) {
+            imm.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }
+
+    /**
+     * Oppo empty-search row / LeftScreen "Commonly used application" ranking.
+     * Shown on session enter and when the query is cleared while session is active.
+     */
+    private void showColorOsCommonlyUsedApps() {
+        if (mAppsView == null
+                || !getResources().getBoolean(R.bool.config_coloros_drawer)) {
+            return;
+        }
+        final int gen = ++mCommonlyUsedLoadGen;
+        final AllAppsStore store = mAppsView.getAppsStore();
+        final Context appContext = getContext().getApplicationContext();
+        MODEL_EXECUTOR.execute(() -> {
+            ArrayList<AdapterItem> items =
+                    ColorOsCommonlyUsedAppsProvider.build(appContext, store);
+            MAIN_EXECUTOR.execute(() -> {
+                if (gen != mCommonlyUsedLoadGen || !isColorOsSearchSessionActive()
+                        || !TextUtils.isEmpty(getText())) {
+                    return;
+                }
+                applyColorOsSearchResults(items, /* softFade= */ true);
+            });
+        });
+    }
+
+    private void applyColorOsSearchResults(ArrayList<AdapterItem> items) {
+        applyColorOsSearchResults(items, /* softFade= */ false);
+    }
+
+    private void applyColorOsSearchResults(ArrayList<AdapterItem> items, boolean softFade) {
+        if (mAppsView == null) {
+            return;
+        }
+        View searchRv = mAppsView.getSearchRecyclerView();
+        if (searchRv instanceof androidx.recyclerview.widget.RecyclerView) {
+            // Oppo search list has no DefaultItemAnimator shuffle on query updates.
+            ((androidx.recyclerview.widget.RecyclerView) searchRv).setItemAnimator(null);
+        }
+        if (softFade && searchRv != null) {
+            searchRv.animate().cancel();
+            searchRv.setAlpha(0.4f);
+        }
+        mAppsView.setSearchResults(items);
+        if (mColorOsImeHelper != null) {
+            mColorOsImeHelper.onSearchResultsChanged();
+        }
+        if (softFade && searchRv != null) {
+            searchRv.animate().alpha(1f).setDuration(180).start();
+        } else if (searchRv != null) {
+            searchRv.setAlpha(1f);
+        }
     }
 
     @Override
     public void onAppsUpdated() {
         mSearchBarController.refreshSearchResult();
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)
+                && isColorOsSearchSessionActive() && TextUtils.isEmpty(getText())) {
+            showColorOsCommonlyUsedApps();
+        }
     }
 
     @Override
     public void resetSearch() {
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)) {
+            exitColorOsSearchSession();
+            return;
+        }
+        mCommonlyUsedLoadGen++;
+        if (mColorOsImeHelper != null) {
+            mColorOsImeHelper.setEnabled(false);
+            mColorOsImeHelper.resetTranslation();
+        }
+        if (isFocused()) {
+            clearFocus();
+        }
+        setColorOsSearchUiActive(false);
         mSearchBarController.reset();
     }
 
@@ -251,17 +591,34 @@ public class AppsSearchContainerLayout extends ExtendedEditText
 
     @Override
     public void onSearchResult(String query, ArrayList<AdapterItem> items) {
+        if (mExitingColorOsSearch) {
+            return;
+        }
+        // Invalidate any in-flight commonly-used load once real query results arrive.
+        mCommonlyUsedLoadGen++;
         if (items != null) {
-            mAppsView.setSearchResults(items);
+            applyColorOsSearchResults(items);
         }
     }
 
     @Override
     public void clearSearchResult() {
+        if (mExitingColorOsSearch) {
+            return;
+        }
         // Clear the search query
         mSearchQueryBuilder.clear();
         mSearchQueryBuilder.clearSpans();
         Selection.setSelection(mSearchQueryBuilder, 0);
+        // ColorOS: clearing while session active restores commonly-used row.
+        if (getResources().getBoolean(R.bool.config_coloros_drawer)
+                && isColorOsSearchSessionActive()) {
+            setColorOsSearchUiActive(true);
+            showColorOsCommonlyUsedApps();
+            updateColorOsClearVisibility();
+            return;
+        }
+        mCommonlyUsedLoadGen++;
         mAppsView.onClearSearchResult();
     }
 

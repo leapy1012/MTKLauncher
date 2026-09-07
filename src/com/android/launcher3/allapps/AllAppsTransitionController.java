@@ -240,11 +240,32 @@ public class AllAppsTransitionController
 
         // ColorOS matches Oppo: tabs + search + letter + icons live in one apps view and
         // translate together on dismiss/open. Do not counter-translate chrome.
+        // While a ColorOS search session is active, leave search/RV translationY alone
+        // (IME helper owns settle above the pill, including resting search).
         if (mAppsView != null
                 && mAppsView.getResources().getBoolean(R.bool.config_coloros_drawer)) {
             View search = mAppsView.getSearchView();
-            if (search != null) {
-                search.setTranslationY(0f);
+            boolean searchSession = mAppsView instanceof
+                    com.android.launcher3.allapps.LauncherAllAppsContainerView
+                    && ((com.android.launcher3.allapps.LauncherAllAppsContainerView) mAppsView)
+                    .isColorOsSearchUiActive();
+            if (progress > 0f) {
+                // Closing the drawer — reset.
+                if (search != null) {
+                    search.setTranslationY(0f);
+                }
+                View searchRv = mAppsView.getSearchRecyclerView();
+                if (searchRv != null) {
+                    searchRv.setTranslationY(0f);
+                }
+            } else if (!searchSession) {
+                if (search != null) {
+                    search.setTranslationY(0f);
+                }
+                View searchRv = mAppsView.getSearchRecyclerView();
+                if (searchRv != null) {
+                    searchRv.setTranslationY(0f);
+                }
             }
             View tab = mAppsView.findViewById(R.id.coloros_category_tab_header);
             if (tab != null) {
@@ -254,7 +275,7 @@ public class AllAppsTransitionController
             if (letter != null) {
                 letter.setTranslationY(0f);
             }
-            if (progress == 0f) {
+            if (progress == 0f && !searchSession) {
                 mAppsView.layoutColorOsAppsBelowTabs();
             }
         }

@@ -35,6 +35,7 @@ import com.android.launcher3.search.SearchCallback;
 import com.android.launcher3.search.StringMatcherUtility;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -90,10 +91,11 @@ public class DefaultAppSearchAlgorithm implements SearchAlgorithm<AdapterItem> {
     }
 
     /**
-     * Filters {@link AppInfo}s matching specified query
+     * Filters {@link AppInfo}s matching specified query.
+     * ColorOS overrides this for Oppo-style fuzzy matching.
      */
     @AnyThread
-    public static ArrayList<AdapterItem> getTitleMatchResult(List<AppInfo> apps, String query) {
+    public ArrayList<AdapterItem> getTitleMatchResult(List<AppInfo> apps, String query) {
         // Do an intersection of the words in the query and each title, and filter out all the
         // apps that don't match all of the words in the query.
         final String queryTextLower = query.toLowerCase();
@@ -106,7 +108,10 @@ public class DefaultAppSearchAlgorithm implements SearchAlgorithm<AdapterItem> {
         for (int i = 0; i < total && resultCount < MAX_RESULTS_COUNT; i++) {
             AppInfo info = apps.get(i);
             if (StringMatcherUtility.matches(queryTextLower, info.title.toString(), matcher)) {
-                result.add(AdapterItem.asApp(info));
+                AdapterItem item = AdapterItem.asApp(info);
+                // Oppo searchHighlightContent — bold the matched query in the label.
+                item.searchHighlightContent = Collections.singletonList(query);
+                result.add(item);
                 resultCount++;
             }
         }

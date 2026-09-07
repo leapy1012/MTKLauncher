@@ -74,4 +74,13 @@ public interface SearchUiManager {
     default boolean inZeroState() {
         return false;
     }
+
+    /**
+     * ColorOS / Oppo: empty-space tap on the search results list.
+     * First tap hides IME (resting search); second exits back to All/Categories.
+     */
+    default void onSearchRecyclerViewClick() {}
+
+    /** ColorOS / Oppo: user scrolled the search results list — hide IME if shown. */
+    default void onSearchRecyclerViewScroll() {}
 }

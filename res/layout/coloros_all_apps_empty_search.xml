@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ColorOS / Oppo drawer empty-search (oppo_search3.png): Lottie + "No results". -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:focusable="false">
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/coloros_search_empty_lottie"
+        android:layout_width="@dimen/coloros_all_apps_search_empty_img_width"
+        android:layout_height="@dimen/coloros_all_apps_search_empty_img_height"
+        android:focusable="false"
+        app:lottie_autoPlay="true"
+        app:lottie_fileName="drawer_search_empty.json"
+        app:lottie_loop="true" />
+
+    <TextView
+        android:id="@+id/empty_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:focusable="false"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
+        android:text="@string/coloros_all_apps_no_search_results"
+        android:textColor="@color/coloros_all_apps_text_secondary"
+        android:textSize="14sp" />
+</LinearLayout>

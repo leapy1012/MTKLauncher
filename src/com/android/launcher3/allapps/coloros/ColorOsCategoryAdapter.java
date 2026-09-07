@@ -23,8 +23,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.customize.overlay.controller.CategoryController;
 import com.android.customize.overlay.model.CategoryInfo;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.model.data.AppInfo;
+import com.android.launcher3.touch.ItemClickHandler;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -233,6 +235,23 @@ public final class ColorOsCategoryAdapter extends RecyclerView.Adapter<RecyclerV
         return bg;
     }
 
+    /** Oppo suggestion/category preview icon → {@link ItemClickHandler} launch. */
+    private static void wireAppLaunch(ImageView iv, AppInfo app) {
+        iv.setTag(app);
+        iv.setClickable(true);
+        iv.setFocusable(true);
+        iv.setOnClickListener(ItemClickHandler.INSTANCE);
+    }
+
+    /** Oppo card/title/stacked → open category folder overlay. */
+    private static void openCategoryFolder(View anchor, CharSequence title, List<AppInfo> apps) {
+        if (apps == null || apps.isEmpty()) {
+            return;
+        }
+        Launcher launcher = Launcher.getLauncher(anchor.getContext());
+        ColorOsCategoryFolderView.show(launcher, title, apps, anchor);
+    }
+
     private List<AppInfo> resolveApps(CategoryInfo info) {
         List<AppInfo> out = new ArrayList<>();
         for (String component : info.getComponentNames()) {
@@ -422,7 +441,12 @@ public final class ColorOsCategoryAdapter extends RecyclerView.Adapter<RecyclerV
                 icons.setLayoutParams(ilp);
             }
             icons.setMetrics(m);
-            icons.bind(row.apps);
+            icons.bind(row.apps, row.title);
+            // Oppo: card empty area + title open the category folder.
+            View.OnClickListener openFolder = v -> openCategoryFolder(v, row.title, row.apps);
+            card.setOnClickListener(openFolder);
+            title.setOnClickListener(openFolder);
+            title.setClickable(true);
         }
     }
 
@@ -478,6 +502,8 @@ public final class ColorOsCategoryAdapter extends RecyclerView.Adapter<RecyclerV
                     }
                     iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     iv.setPadding(iconPad, iconPad, iconPad, iconPad);
+                    // Oppo suggestion: icons launch only (no folder open).
+                    wireAppLaunch(iv, app);
                     FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(m.cell, m.cell);
                     lp.leftMargin = pad + i * (m.cell + gap);
                     lp.topMargin = 0;
@@ -509,7 +535,7 @@ public final class ColorOsCategoryAdapter extends RecyclerView.Adapter<RecyclerV
             }
         }
 
-        void bind(List<AppInfo> apps) {
+        void bind(List<AppInfo> apps, CharSequence categoryTitle) {
             mApps = apps;
             removeAllViews();
             boolean overflow = apps.size() > MAX_PREVIEW;
@@ -527,8 +553,15 @@ public final class ColorOsCategoryAdapter extends RecyclerView.Adapter<RecyclerV
                     } else if (apps.get(i).bitmap != null) {
                         iv.setImageBitmap(apps.get(i).bitmap.icon);
                     }
-                } else if (apps.get(i).bitmap != null) {
-                    iv.setImageBitmap(apps.get(i).bitmap.icon);
+                    // Oppo stacked overflow cell opens the folder.
+                    iv.setClickable(true);
+                    iv.setFocusable(true);
+                    iv.setOnClickListener(v -> openCategoryFolder(v, categoryTitle, apps));
+                } else {
+                    if (apps.get(i).bitmap != null) {
+                        iv.setImageBitmap(apps.get(i).bitmap.icon);
+                    }
+                    wireAppLaunch(iv, apps.get(i));
                 }
                 addView(iv);
             }

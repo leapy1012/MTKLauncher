@@ -47,6 +47,7 @@ import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.WindowInsets;
@@ -329,6 +330,19 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
     }
 
     /**
+     * ColorOS: leave search without the AOSP search→A-Z transition that forces the
+     * All apps list visible (flashes All when the user was on Categories).
+     */
+    public void clearColorOsSearchSessionResults() {
+        getMainAdapterProvider().clearHighlightedItem();
+        getSearchResultList().setSearchResults(null);
+        mIsSearching = false;
+        getSearchRecyclerView().setVisibility(GONE);
+        // Caller finishes with setSearchUiActive(false) → syncPageVisibility for
+        // All vs Categories. Do not animateToSearchState(false) / updateSearchResultsVisibility.
+    }
+
+    /**
      * Sets results list for search
      */
     public void setSearchResults(ArrayList<AdapterItem> results) {
@@ -485,6 +499,14 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
 
     public boolean isSearching() {
         return mIsSearching;
+    }
+
+    /**
+     * ColorOS search keeps drawer chrome hidden; AOSP search transition must not
+     * flash All-apps / floating header during that session.
+     */
+    protected boolean suppressSearchTransitionChrome() {
+        return false;
     }
 
     @Override
@@ -713,6 +735,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         if (tab == null) {
             return;
         }
+        boolean searchSession = isColorOsSearchSessionActive();
         int overlap = getResources().getDimensionPixelSize(
                 R.dimen.coloros_all_apps_under_tab_overlap);
         int belowGap = getResources().getDimensionPixelSize(
@@ -725,7 +748,9 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             topMargin = tabBottom - overlap + belowGap;
         }
         layoutColorOsContent(getAppsRecyclerViewContainer(), topMargin);
-        layoutColorOsContent(getSearchRecyclerView(), topMargin);
+        // During search, tabs are hidden — pin search RV from the top so settle
+        // translation has room to hug the pill (Oppo frequent row).
+        layoutColorOsContent(getSearchRecyclerView(), searchSession ? 0 : topMargin);
         View appsList = findViewById(R.id.apps_list_view);
         if (appsList != null && appsList != getAppsRecyclerViewContainer()) {
             layoutColorOsContent(appsList, topMargin);
@@ -736,10 +761,32 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             tab.setTranslationY(0f);
         }
         View search = getSearchView();
-        if (search != null && search.getTranslationY() != 0f) {
+        // Never clear IME-raised pill translation while a ColorOS search session
+        // is active — that race left frequent apps stuck at the top of the screen.
+        if (!searchSession && search != null && search.getTranslationY() != 0f) {
             search.setTranslationY(0f);
         }
+        if (searchSession) {
+            notifyColorOsSearchLayoutSettled();
+        }
         tab.bringToFront();
+    }
+
+    /**
+     * True while ColorOS drawer search session is active (IME or resting).
+     * Overridden by {@link LauncherAllAppsContainerView}.
+     */
+    protected boolean isColorOsSearchSessionActive() {
+        return false;
+    }
+
+    /** Hook for ColorOS IME helper to re-settle after host layout. */
+    protected void notifyColorOsSearchLayoutSettled() {
+        View search = getSearchView();
+        if (search instanceof com.android.launcher3.allapps.search.AppsSearchContainerLayout) {
+            ((com.android.launcher3.allapps.search.AppsSearchContainerLayout) search)
+                    .onColorOsHostLayoutSettled();
+        }
     }
 
     /**
@@ -1167,12 +1214,72 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
             mTouchHandler.handleTouchEvent(ev, mFastScrollerOffset);
             return true;
         }
+        // ColorOS search: Oppo search-list-container empty tap — hide IME / exit
+        // search for wallpaper areas outside the results RV (not only RV empty cells).
+        if (isColorOsSearchSessionActive()
+                && mActivityContext.getDragLayer().isEventOverView(this, ev)) {
+            return handleColorOsSearchBackgroundTouch(ev);
+        }
         if (isSearching()
                 && mActivityContext.getDragLayer().isEventOverView(getVisibleContainerView(), ev)) {
             // if in search state, consume touch event.
             return true;
         }
         return false;
+    }
+
+    /**
+     * Oppo {@code setupSearchListContainerTouchListener}: empty tap on wallpaper /
+     * drawer chrome outside the (IME-settled) search RV — hide IME then exit search.
+     * Touches that still hit the search RV are owned by {@link SearchRecyclerView}.
+     */
+    private boolean mColorOsBgTrackingClick;
+    private float mColorOsBgDownX;
+    private float mColorOsBgDownY;
+
+    private boolean handleColorOsSearchBackgroundTouch(MotionEvent ev) {
+        final int action = ev.getActionMasked();
+        View search = getSearchView();
+        if (search != null && mActivityContext.getDragLayer().isEventOverView(search, ev)) {
+            mColorOsBgTrackingClick = false;
+            return false;
+        }
+        View searchRv = getSearchRecyclerView();
+        if (searchRv != null
+                && mActivityContext.getDragLayer().isEventOverView(searchRv, ev)) {
+            // Settled RV still owns in-bounds empty taps / icon launches.
+            mColorOsBgTrackingClick = false;
+            return false;
+        }
+
+        int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        if (action == MotionEvent.ACTION_DOWN) {
+            mColorOsBgTrackingClick = true;
+            mColorOsBgDownX = ev.getX();
+            mColorOsBgDownY = ev.getY();
+            return true;
+        }
+        if (action == MotionEvent.ACTION_MOVE) {
+            if (mColorOsBgTrackingClick
+                    && (Math.abs(ev.getX() - mColorOsBgDownX) > slop
+                    || Math.abs(ev.getY() - mColorOsBgDownY) > slop)) {
+                mColorOsBgTrackingClick = false;
+                getSearchUiManager().onSearchRecyclerViewScroll();
+            }
+            return true;
+        }
+        if (action == MotionEvent.ACTION_CANCEL) {
+            mColorOsBgTrackingClick = false;
+            return true;
+        }
+        if (action == MotionEvent.ACTION_UP) {
+            if (mColorOsBgTrackingClick) {
+                mColorOsBgTrackingClick = false;
+                getSearchUiManager().onSearchRecyclerViewClick();
+            }
+            return true;
+        }
+        return true;
     }
 
     /** The current active recycler view (A-Z list from one of the profiles, or search results). */

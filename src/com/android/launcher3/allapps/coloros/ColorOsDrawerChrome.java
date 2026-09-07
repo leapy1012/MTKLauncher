@@ -71,6 +71,8 @@ public final class ColorOsDrawerChrome {
     private ColorOsCategoryAdapter mCategoryAdapter;
     private boolean mShowingCategories;
     private boolean mPageAnimating;
+    /** ColorOS search focus/IME session — drawer chrome faded (Oppo animateForSearch). */
+    private boolean mSearchUiActive;
     /** Ignore segment callbacks while swipe syncs the pill. */
     private boolean mSuppressSegmentCallback;
     /** Section shown in the last cluster filter; used to land the list on dismiss. */
@@ -105,6 +107,69 @@ public final class ColorOsDrawerChrome {
         return mShowingCategories;
     }
 
+    /** True while the search field is focused / IME search session is active. */
+    public boolean isSearchUiActive() {
+        return mSearchUiActive;
+    }
+
+    /**
+     * Oppo {@code animateForSearch}: fade tabs, letter rail, category list, and apps
+     * so wallpaper + scrim remain; search pill stays visible and raises with IME.
+     */
+    public void setSearchUiActive(boolean active) {
+        if (mSearchUiActive == active) {
+            if (active) {
+                applySearchUiVisibility();
+            }
+            return;
+        }
+        mSearchUiActive = active;
+        if (active) {
+            dismissPopupWindow();
+            dismissLetterCluster();
+            // Hide drawer pages immediately (Oppo springs all_apps_content → 0).
+            applySearchUiVisibility();
+            if (mTabHeader != null) {
+                mTabHeader.animate().cancel();
+                mTabHeader.setAlpha(0f);
+                mTabHeader.setEnabled(false);
+            }
+            if (mLetterIndex != null) {
+                mLetterIndex.animate().cancel();
+                mLetterIndex.setAlpha(0f);
+            }
+            // Re-pin search RV from top (no tab inset) and settle frequent apps.
+            mContainer.layoutColorOsAppsBelowTabs();
+        } else {
+            if (mTabHeader != null) {
+                mTabHeader.animate().cancel();
+                mTabHeader.setAlpha(1f);
+                mTabHeader.setEnabled(true);
+            }
+            if (mLetterIndex != null) {
+                mLetterIndex.animate().cancel();
+                mLetterIndex.setAlpha(1f);
+            }
+            View apps = resolveAppsContentView();
+            if (apps != null) {
+                apps.animate().cancel();
+                apps.setAlpha(1f);
+            }
+            View appsContainer = mContainer.getAppsRecyclerViewContainer();
+            if (appsContainer != null) {
+                appsContainer.animate().cancel();
+                appsContainer.setAlpha(1f);
+            }
+            if (mCategoryList != null) {
+                mCategoryList.animate().cancel();
+                mCategoryList.setAlpha(1f);
+            }
+            syncPageVisibility();
+            // Restore apps/search RV pin under tabs after leaving search.
+            mContainer.layoutColorOsAppsBelowTabs();
+        }
+    }
+
     /**
      * Oppo/AOSP All-apps dismiss gate for the Categories list: allow the parent
      * drawer to pull down only when the category grid is scrolled to the top
@@ -137,6 +202,9 @@ public final class ColorOsDrawerChrome {
      * Returns true when this gesture should own the stream.
      */
     public boolean onInterceptPageSwipe(MotionEvent ev) {
+        if (mSearchUiActive || mContainer.isSearching()) {
+            return false;
+        }
         if (mPageAnimating || mTabHeader == null) {
             return false;
         }
@@ -1126,6 +1194,10 @@ public final class ColorOsDrawerChrome {
      * apps RecyclerView visible again (search exit, drawer reopen, rebind).
      */
     public void syncPageVisibility() {
+        if (mSearchUiActive || mContainer.isSearching()) {
+            applySearchUiVisibility();
+            return;
+        }
         View apps = resolveAppsContentView();
         View appsContainer = mContainer.getAppsRecyclerViewContainer();
         View cats = mCategoryList;
@@ -1189,7 +1261,54 @@ public final class ColorOsDrawerChrome {
             search.bringToFront();
         }
         if (mTabHeader != null) {
+            mTabHeader.setVisibility(View.VISIBLE);
+            mTabHeader.setAlpha(1f);
+            mTabHeader.setEnabled(true);
             mTabHeader.bringToFront();
+        }
+    }
+
+    /**
+     * While searching: hide All/Categories chrome; leave AOSP search RV visibility
+     * to {@link ActivityAllAppsContainerView#updateSearchResultsVisibility()}.
+     */
+    private void applySearchUiVisibility() {
+        mPageAnimating = false;
+        View stockHeader = mContainer.getFloatingHeaderView();
+        if (stockHeader != null) {
+            stockHeader.setVisibility(View.GONE);
+        }
+        setGoneOrInvisible(resolveAppsContentView(), View.GONE);
+        View appsContainer = mContainer.getAppsRecyclerViewContainer();
+        View apps = resolveAppsContentView();
+        if (appsContainer != null && appsContainer != apps) {
+            setGoneOrInvisible(appsContainer, View.GONE);
+        }
+        if (mCategoryList != null) {
+            setGoneOrInvisible(mCategoryList, View.GONE);
+        }
+        if (mLetterIndex != null) {
+            mLetterIndex.setVisibility(View.GONE);
+        }
+        dismissLetterCluster();
+        if (mTabHeader != null) {
+            mTabHeader.setEnabled(false);
+            // Keep in layout for restore; invisible so wallpaper shows through.
+            mTabHeader.setVisibility(View.INVISIBLE);
+        }
+        View search = mContainer.getSearchView();
+        if (search != null) {
+            search.setVisibility(View.VISIBLE);
+            search.bringToFront();
+        }
+        // Whole search session (IME up or resting): keep the search list visible.
+        View searchRv = mContainer.getSearchRecyclerView();
+        if (searchRv != null) {
+            searchRv.setVisibility(View.VISIBLE);
+            searchRv.bringToFront();
+        }
+        if (search != null) {
+            search.bringToFront();
         }
     }
 
